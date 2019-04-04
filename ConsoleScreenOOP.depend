@@ -1,0 +1,26 @@
+# depslib dependency file v1.0
+1554385977 source:e:\documents\codeblocks-projs\consolescreenoop\main.cpp
+	<iostream>
+	<stdlib.h>
+	<stdio.h>
+	<windows.h>
+	"include/cConScreen.h"
+
+1554382223 e:\documents\codeblocks-projs\consolescreenoop\include\conscreen.h
+
+1554383633 source:e:\documents\codeblocks-projs\consolescreenoop\src\conscreen.cpp
+	<iostream>
+	<windows.h>
+	"conScreen.h"
+	<conio.h>
+	<stdio.h>
+
+1554382223 e:\documents\codeblocks-projs\consolescreenoop\include\cconscreen.h
+
+1554386065 source:e:\documents\codeblocks-projs\consolescreenoop\src\cconscreen.cpp
+	<iostream>
+	<windows.h>
+	"cConScreen.h"
+	<conio.h>
+	<stdio.h>
+
