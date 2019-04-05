@@ -15,7 +15,13 @@ int main()
 
   scr.insColor(12,2).drawOval(20,12,16,8,'A');
 
-  scr.setFrameID(1).insColor(3,11).insByte(0).drawFrame(1,1,78,23);
+  scr.setFrameID(4).insColor(3,11).insByte(' ').drawFrame(1,1,78,23);
+
+  scr.insColor(14,2).drawText(2,2,"Some test here");
+
+  scr.insColor(2,6).drawRect(45,3,9,5,176);
+
+  scr.clrScreen(' ', 0);
 
   while(1);
 }

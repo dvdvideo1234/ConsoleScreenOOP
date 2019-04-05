@@ -20,6 +20,8 @@
 //     14 = LightYellow
 //     15 = White
 
+// https://docs.microsoft.com/en-us/windows/console/console-reference
+
 typedef class conScreen
 {
   public:
@@ -33,13 +35,16 @@ typedef class conScreen
     WORD getEventType(void);
     conScreen& setPos(SHORT x, SHORT y);
     conScreen& setSize(SHORT x, SHORT y);
-    conScreen& Clear(void);
     conScreen& readInput(void);
     KEY_EVENT_RECORD* getEventKey(void);
     MOUSE_EVENT_RECORD* getEventMouse(void);
     MENU_EVENT_RECORD* getEventMenu(void);
     FOCUS_EVENT_RECORD* getEventFocus(void);
     WINDOW_BUFFER_SIZE_RECORD* getEventBuffer(void);
+    #if _WIN32_WINNT > 0x0500
+      CONSOLE_FONT_INFO* getFontInfo(BOOL wmax);
+    #endif
+    CONSOLE_SCREEN_BUFFER_INFO* getBufferInfo(void);
     conScreen& setColor(WORD clr);
     conScreen& setColor(WORD fg, WORD bg);
     conScreen& insByte(WORD chr);
@@ -48,6 +53,13 @@ typedef class conScreen
     conScreen& setCursorInfo(CONSOLE_CURSOR_INFO *cci);
     conScreen& setCursorMode(DWORD flag);
     conScreen& setFrameID(DWORD fid);
+    conScreen& fillCharacter(void);
+    conScreen& fillCharacter(BYTE pat);
+    conScreen& fillColor(void);
+    conScreen& fillColor(WORD clr);
+    conScreen& clrScreen(void);
+    conScreen& clrScreen(BYTE pat);
+    conScreen& clrScreen(BYTE pat, WORD clr);
     conScreen& drawPalette(void);
     conScreen& drawPalette(SHORT x, SHORT y);
     conScreen& drawPalette(SHORT x, SHORT y, const void* txt);
@@ -80,14 +92,17 @@ typedef class conScreen
     virtual ~conScreen();
   protected:
     BYTE m_iFrameID;
-    BYTE m_cChar;
+    BYTE m_curChar;
     HANDLE m_hConOut;
     HANDLE m_hConIn;
     INPUT_RECORD m_stInput;
     DWORD m_uiEvents;
-    COORD m_xyDpos;
-    COORD m_xyDsiz;
+    COORD m_xyPos;
+    COORD m_xySiz;
+    COORD m_xyTmp;
     WORD m_curCol;
+    CONSOLE_FONT_INFO m_curFont;
+    CONSOLE_SCREEN_BUFFER_INFO m_curBuff;
   private:
 } cConScreen;
 

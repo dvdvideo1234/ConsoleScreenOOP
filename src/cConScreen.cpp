@@ -7,13 +7,22 @@
 
 #define CON_STRING_LEN 0xffff
 
-// top-left , top-right, bottom-left, bottom-right
-// top-hline, bot-hline, top-hline  , bot-hline
-static BYTE puFrame[3][8] =
+// [0] Top left corner
+// [1] Top right corner
+// [2] Bottom left corner
+// [3] Bottom right corner
+// [4] Top horizontal line
+// [5] Bottom horizontal line
+// [6] Left Vertical line
+// [7] Right Vertical Line
+// http://www.asciitable.com/
+static BYTE puFrame[5][8] =
 {
   { 0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 },
   {201, 187, 200, 188, 205, 205, 186, 186},
-  {214, 183, 211, 189, 196, 196, 186, 186}
+  {214, 183, 211, 189, 196, 196, 186, 186},
+  {213, 184, 212, 190, 205, 205, 179, 179},
+  {218, 191, 192, 217, 196, 196, 179, 179}
 };
 
 conScreen::conScreen()
@@ -21,12 +30,12 @@ conScreen::conScreen()
   this->m_hConOut  = GetStdHandle(STD_OUTPUT_HANDLE);
   this->m_hConIn   = GetStdHandle(STD_INPUT_HANDLE);
   this->m_iFrameID = 0;
-  this->m_cChar    = 0;
+  this->m_curChar  = 0;
   this->m_uiEvents = 0;
-  this->m_xyDpos.X = 0;
-  this->m_xyDpos.Y = 0;
-  this->m_xyDsiz.X = 0;
-  this->m_xyDsiz.Y = 0;
+  this->m_xyPos.X  = 0;
+  this->m_xyPos.Y  = 0;
+  this->m_xySiz.X  = 0;
+  this->m_xySiz.Y  = 0;
   this->m_curCol   = 0;
 }
 
@@ -35,30 +44,48 @@ conScreen::~conScreen()
   //dtor
 }
 
+//***************************BUFFER AND FONT******************************************
+
+CONSOLE_SCREEN_BUFFER_INFO* conScreen::getBufferInfo(void)
+{
+  GetConsoleScreenBufferInfo(this->m_hConOut, &this->m_curBuff);
+  return &this->m_curBuff;
+}
+
+#if _WIN32_WINNT > 0x0500
+  // https://docs.microsoft.com/en-us/windows/console/getcurrentconsolefont
+  CONSOLE_FONT_INFO* conScreen::getFontInfo(BOOL wmax)
+  {
+    GetCurrentConsoleFont(this->m_hConOut, wmax, &this->m_curFont);
+    return &this->m_curFont;
+  }
+
+#endif
+
 //*****************************POSITION AND SIZE*****************************************
 
 conScreen& conScreen::setPos(SHORT x, SHORT y)
 {
-  this->m_xyDpos.X = x; this->m_xyDpos.Y = y;
-  SetConsoleCursorPosition(this->m_hConOut, this->m_xyDpos);
+  this->m_xyPos.X = x; this->m_xyPos.Y = y;
+  SetConsoleCursorPosition(this->m_hConOut, this->m_xyPos);
   return *this;
 }
 
 COORD* conScreen::getPos(void)
 {
-  return &(this->m_xyDpos);
+  return &(this->m_xyPos);
 }
 
 conScreen& conScreen::setSize(SHORT x, SHORT y)
 {
-  this->m_xyDsiz.X = x; this->m_xyDsiz.Y = y;
-  SetConsoleScreenBufferSize(this->m_hConOut, this->m_xyDsiz);
+  this->m_xySiz.X = x; this->m_xySiz.Y = y;
+  SetConsoleScreenBufferSize(this->m_hConOut, this->m_xySiz);
   return *this;
 }
 
 COORD* conScreen::getSize(void)
 {
-  return &(this->m_xyDsiz);
+  return &(this->m_xySiz);
 }
 
 //***************************HANDLE******************************************
@@ -74,10 +101,11 @@ HANDLE conScreen::getHandleIn(void) const
 }
 
 //*****************************CHAR AND COLOR**************************************
+// https://docs.microsoft.com/en-us/windows/console/console-screen-buffers#_win32_font_attributes
 
 conScreen& conScreen::insByte(WORD chr)
 {
-  this->m_cChar = chr; return *this;
+  this->m_curChar = chr; return *this;
 }
 
 conScreen& conScreen::insColor(WORD clr)
@@ -87,7 +115,7 @@ conScreen& conScreen::insColor(WORD clr)
 
 conScreen& conScreen::insColor(WORD fg, WORD bg)
 {
-  return insColor(16*bg + fg);
+  return insColor(16 * bg + fg);
 }
 
 conScreen& conScreen::setColor(WORD clr)
@@ -97,23 +125,52 @@ conScreen& conScreen::setColor(WORD clr)
 
 conScreen& conScreen::setColor(WORD fg, WORD bg)
 {
-  return this->setColor(16*bg + fg);
+  return this->setColor(16 * bg + fg);
+}
+
+//*********************************FILL************************************
+
+conScreen& conScreen::fillCharacter(BYTE pat)
+{
+  DWORD cCharsWritten, dwConSize; setPos(0,0);
+  dwConSize = this->m_xySiz.X * this->m_xySiz.Y;
+  FillConsoleOutputCharacter(this->m_hConOut, pat, dwConSize, this->m_xyPos, &cCharsWritten);
+  return *this;
+}
+
+conScreen& conScreen::fillCharacter(void)
+{
+  return fillCharacter(this->m_curChar);
+}
+
+conScreen& conScreen::fillColor(WORD clr)
+{
+  DWORD cCharsWritten, dwConSize; setPos(0,0);
+  dwConSize = this->m_xySiz.X * this->m_xySiz.Y;
+  FillConsoleOutputAttribute(this->m_hConOut, clr, dwConSize, this->m_xyPos, &cCharsWritten);
+  return *this;
+}
+
+conScreen& conScreen::fillColor(void)
+{
+  return fillColor(this->m_curCol);
 }
 
 //*****************************************************************************
 
-conScreen& conScreen::Clear(void)
+conScreen& conScreen::clrScreen(BYTE pat, WORD clr)
 {
-  COORD xyPos = {0,0};
-  DWORD cCharsWritten, dwConSize;
-  CONSOLE_SCREEN_BUFFER_INFO csbi;
-  GetConsoleScreenBufferInfo(this->m_hConOut,&csbi);
-  dwConSize = csbi.dwSize.X * csbi.dwSize.Y;
-  FillConsoleOutputCharacter(this->m_hConOut, TEXT(' '), dwConSize, xyPos, &cCharsWritten);
-  GetConsoleScreenBufferInfo(this->m_hConOut, &csbi);
-  FillConsoleOutputAttribute(this->m_hConOut, csbi.wAttributes, dwConSize, xyPos, &cCharsWritten);
-  SetConsoleCursorPosition(this->m_hConOut, xyPos);
-  return *this;
+  return fillCharacter(pat).fillColor(clr).setPos(0,0);
+}
+
+conScreen& conScreen::clrScreen(BYTE pat)
+{
+  return fillCharacter(pat).fillColor().setPos(0,0);
+}
+
+conScreen& conScreen::clrScreen(void)
+{
+  return fillCharacter().fillColor().setPos(0,0);
 }
 
 //*********************************TEXT**********************************
@@ -130,12 +187,12 @@ conScreen& conScreen::drawText(SHORT x, SHORT y, const void* txt)
 
 conScreen& conScreen::drawText(const void* txt, WORD clr)
 {
-  return drawText(this->m_xyDpos.X,this->m_xyDpos.X,txt,clr);
+  return drawText(this->m_xyPos.X,this->m_xyPos.X,txt,clr);
 }
 
 conScreen& conScreen::drawText(const void* txt)
 {
-  return drawText(this->m_xyDpos.X,this->m_xyDpos.X,txt,this->m_curCol);
+  return drawText(this->m_xyPos.X,this->m_xyPos.X,txt,this->m_curCol);
 }
 
 //*********************************INPUT AND EVENTS**********************************
@@ -219,7 +276,7 @@ conScreen& conScreen::drawPixel(SHORT x, SHORT y, BYTE chr)
 
 conScreen& conScreen::drawPixel(SHORT x, SHORT y)
 {
-  return drawPixel(x,y,this->m_cChar,this->m_curCol);
+  return drawPixel(x,y,this->m_curChar,this->m_curCol);
 }
 
 conScreen& conScreen::drawPixelAnex(SHORT x, SHORT y, BYTE lev, WORD clr)
@@ -290,7 +347,7 @@ conScreen& conScreen::drawOval(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE chr)
 
 conScreen& conScreen::drawOval(SHORT x, SHORT y, SHORT sx, SHORT sy)
 {
-  return drawOval(x,y,sx,sy,this->m_cChar,this->m_curCol);
+  return drawOval(x,y,sx,sy,this->m_curChar,this->m_curCol);
 }
 
 //*****************************************************************************
@@ -345,7 +402,7 @@ conScreen& conScreen::drawLine(SHORT x0, SHORT y0, SHORT x1, SHORT y1, BYTE chr)
 
 conScreen& conScreen::drawLine(SHORT x0, SHORT y0, SHORT x1, SHORT y1)
 {
-  return drawLine(x0,y0,x1,y1,this->m_cChar,this->m_curCol);
+  return drawLine(x0,y0,x1,y1,this->m_curChar,this->m_curCol);
 }
 
 
@@ -366,19 +423,19 @@ DWORD conScreen::getFrameID(void) const
 conScreen& conScreen::drawFrame(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE chr, WORD col, BYTE* tit, CHAR cen)
 {
   BYTE *arr = puFrame[this->m_iFrameID];
-  drawPixel(x     ,y     ,chr > 0 ? chr : arr[0],col);    //Top left corner of drawframe
-  drawPixel(x+sx-1,y     ,chr > 0 ? chr : arr[1],col);   //Top right corner of drawframe
-  drawPixel(x     ,y+sy-1,chr > 0 ? chr : arr[2],col);   //Bottom left corner of drawframe
-  drawPixel(x+sx-1,y+sy-1,chr > 0 ? chr : arr[3],col);  //Bottom right corner of drawframe
+  drawPixel(x     ,y     ,chr > 0 ? chr : arr[0],col); // Top left corner of drawframe
+  drawPixel(x+sx-1,y     ,chr > 0 ? chr : arr[1],col); // Top right corner of drawframe
+  drawPixel(x     ,y+sy-1,chr > 0 ? chr : arr[2],col); // Bottom left corner of drawframe
+  drawPixel(x+sx-1,y+sy-1,chr > 0 ? chr : arr[3],col); // Bottom right corner of drawframe
   for(int ix = x+1; ix < x+sx-1; ix++)
   {
-    drawPixel(ix,     y,chr > 0 ? chr : arr[4],col);     // Top horizontal line
-    drawPixel(ix,y+sy-1,chr > 0 ? chr : arr[5],col);    // Bottom Horizontal line
+    drawPixel(ix,     y,chr > 0 ? chr : arr[4],col);   // Top horizontal line
+    drawPixel(ix,y+sy-1,chr > 0 ? chr : arr[5],col);   // Bottom Horizontal line
   }
   for(int iy = y+1; iy < y+sy-1; iy++)
   {
-    drawPixel(x     ,iy,chr > 0 ? chr : arr[6],col);    //Left Vertical line
-    drawPixel(x+sx-1,iy,chr > 0 ? chr : arr[7],col);   //Right Vertical Line
+    drawPixel(x     ,iy,chr > 0 ? chr : arr[6],col);   // Left Vertical line
+    drawPixel(x+sx-1,iy,chr > 0 ? chr : arr[7],col);   // Right Vertical Line
   }
   if(tit != NULL)
   {
@@ -408,7 +465,7 @@ conScreen& conScreen::drawFrame(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE chr)
 
 conScreen& conScreen::drawFrame(SHORT x, SHORT y, SHORT sx, SHORT sy)
 {
-  return drawFrame(x, y, sx, sy, this->m_cChar, this->m_curCol, NULL, 0);
+  return drawFrame(x, y, sx, sy, this->m_curChar, this->m_curCol, NULL, 0);
 }
 
  //*****************************RECTANGLE***********************************
@@ -420,8 +477,7 @@ conScreen& conScreen::drawRect(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE pat, W
   {
     for(int ix=x;ix<x+sx;ix++) //Fill X region Loop
     {
-      setPos(ix,iy);           // Position the cursor
-      std::cout << pat;        //Draw Solid space
+      drawPixel(ix,iy,pat);
     }
   }; return *this;
 }
@@ -433,7 +489,7 @@ conScreen& conScreen::drawRect(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE pat)
 
 conScreen& conScreen::drawRect(SHORT x, SHORT y, SHORT sx, SHORT sy)
 {
-  return drawRect(x, y, sx, sy, this->m_cChar, this->m_curCol);
+  return drawRect(x, y, sx, sy, this->m_curChar, this->m_curCol);
 }
 
 //**********************************WINDOW********************************
@@ -447,7 +503,7 @@ conScreen& conScreen::drawWindow(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE chef
 
 conScreen& conScreen::drawWindow(SHORT x, SHORT y, SHORT sx, SHORT sy, BYTE cher, WORD colr, BYTE* tit)
 {
-  drawFrame(x,y,sx,sy,this->m_cChar,this->m_curCol,tit);
+  drawFrame(x,y,sx,sy,this->m_curChar,this->m_curCol,tit);
   drawRect(x+1,y+1,sx-2,sy-2,cher,colr);
   return *this;
 }
