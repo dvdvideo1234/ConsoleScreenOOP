@@ -13,3 +13,6 @@ and the [personal editor PE2](http://texteditors.org/cgi-bin/wiki.pl?PE2) have s
 
 ### Installation
 You can compile the project using the [latest version of CodeBlocks](http://www.codeblocks.org/). The repo contains the entire project.
+
+### A preview of the test program is shown below:
+![screenshot](https://raw.githubusercontent.com/dvdvideo1234/ConsoleScreenOOP/master/images/screenshot.JPG)
